@@ -119,7 +119,8 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 	if unsup_loss == 'margin':
 		num_neg = 6
 	elif unsup_loss == 'normal':
-		num_neg = 100
+		# num_neg = 100
+		num_neg = 1
 	else:
 		print("unsup_loss can be only 'margin' or 'normal'.")
 		sys.exit(1)
@@ -142,11 +143,12 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 
 	visited_nodes = set()
 	for index in range(batches):
-		nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]
+		nodes_batch = train_nodes[index*b_sz:(index+1)*b_sz]#一个batch的节点
 
-		# extend nodes batch for unspervised learning
+		# extend nodes batch for unspervised learning，对无监督学习进行了拓展采样
 		# no conflicts with supervised learning
-		nodes_batch = np.asarray(list(unsupervised_loss.extend_nodes(nodes_batch, num_neg=num_neg)))
+		# 演示过程中，临时注释掉拓展采样
+		# nodes_batch = np.asarray(list(unsupervised_loss.extend_nodes(nodes_batch, num_neg=num_neg)))
 		visited_nodes |= set(nodes_batch)
 
 		# get ground-truth for the nodes batch
@@ -154,7 +156,7 @@ def apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, b_
 
 		# feed nodes batch to the graphSAGE
 		# returning the nodes embeddings
-		embs_batch = graphSage(nodes_batch)
+		embs_batch = graphSage(nodes_batch)#得到graphSage之后的节点特征
 
 		if learn_method == 'sup':
 			# superivsed learning

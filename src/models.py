@@ -244,27 +244,27 @@ class GraphSage(nn.Module):
 		nodes_batch	-- batch of nodes to learn the embeddings
 		"""
 		lower_layer_nodes = list(nodes_batch)
-		nodes_batch_layers = [(lower_layer_nodes,)]
+		nodes_batch_layers = [(lower_layer_nodes,)]#第一次放入的节点
 		# self.dc.logger.info('get_unique_neighs.')
 		for i in range(self.num_layers):
-			lower_samp_neighs, lower_layer_nodes_dict, lower_layer_nodes= self._get_unique_neighs_list(lower_layer_nodes)
-			nodes_batch_layers.insert(0, (lower_layer_nodes, lower_samp_neighs, lower_layer_nodes_dict))
+			lower_samp_neighs, lower_layer_nodes_dict, lower_layer_nodes= self._get_unique_neighs_list(lower_layer_nodes)#获得邻居节点
+			nodes_batch_layers.insert(0, (lower_layer_nodes, lower_samp_neighs, lower_layer_nodes_dict))#insert 0，从最外层开始聚合
 
 		assert len(nodes_batch_layers) == self.num_layers + 1
 
 		pre_hidden_embs = self.raw_features
 		for index in range(1, self.num_layers+1):
-			nb = nodes_batch_layers[index][0]
-			pre_neighs = nodes_batch_layers[index-1]
+			nb = nodes_batch_layers[index][0]#聚合自己和周围节点
+			pre_neighs = nodes_batch_layers[index-1]#上层的邻居节点
 			# self.dc.logger.info('aggregate_feats.')
-			aggregate_feats = self.aggregate(nb, pre_hidden_embs, pre_neighs)
+			aggregate_feats = self.aggregate(nb, pre_hidden_embs, pre_neighs)#聚合函数
 			sage_layer = getattr(self, 'sage_layer'+str(index))
-			if index > 1:
+			if index > 1:#第1层的batch节点，没有进行转换
 				nb = self._nodes_map(nb, pre_hidden_embs, pre_neighs)
 			# self.dc.logger.info('sage_layer.')
-			cur_hidden_embs = sage_layer(self_feats=pre_hidden_embs[nb],
+			cur_hidden_embs = sage_layer(self_feats=pre_hidden_embs[nb],#拼接节点本身特征，和聚集的上一层邻居节点信息
 										aggregate_feats=aggregate_feats)
-			pre_hidden_embs = cur_hidden_embs
+			pre_hidden_embs = cur_hidden_embs#得到当前层的表征（包含当前节点和上一层所有的邻居节点信息）
 
 		return pre_hidden_embs
 
@@ -276,42 +276,42 @@ class GraphSage(nn.Module):
 
 	def _get_unique_neighs_list(self, nodes, num_sample=10):
 		_set = set
-		to_neighs = [self.adj_lists[int(node)] for node in nodes]
-		if not num_sample is None:
+		to_neighs = [self.adj_lists[int(node)] for node in nodes]#获取节点的邻居
+		if not num_sample is None:#对邻居节点进行采样
 			_sample = random.sample
 			samp_neighs = [_set(_sample(to_neigh, num_sample)) if len(to_neigh) >= num_sample else to_neigh for to_neigh in to_neighs]
 		else:
 			samp_neighs = to_neighs
-		samp_neighs = [samp_neigh | set([nodes[i]]) for i, samp_neigh in enumerate(samp_neighs)]
-		_unique_nodes_list = list(set.union(*samp_neighs))
+		samp_neighs = [samp_neigh | set([nodes[i]]) for i, samp_neigh in enumerate(samp_neighs)]#所有邻居节点（包含本身节点）
+		_unique_nodes_list = list(set.union(*samp_neighs))#经过去重，这个batch的所有节点
 		i = list(range(len(_unique_nodes_list)))
-		unique_nodes = dict(list(zip(_unique_nodes_list, i)))
+		unique_nodes = dict(list(zip(_unique_nodes_list, i)))#字典编号
 		return samp_neighs, unique_nodes, _unique_nodes_list
 
 	def aggregate(self, nodes, pre_hidden_embs, pre_neighs, num_sample=10):
-		unique_nodes_list, samp_neighs, unique_nodes = pre_neighs
+		unique_nodes_list, samp_neighs, unique_nodes = pre_neighs#当前中心节点结合nodes,拿到nodes所有邻居节点的信息
 
 		assert len(nodes) == len(samp_neighs)
-		indicator = [(nodes[i] in samp_neighs[i]) for i in range(len(samp_neighs))]
+		indicator = [(nodes[i] in samp_neighs[i]) for i in range(len(samp_neighs))]#判断是否包含节点本身
 		assert (False not in indicator)
 		if not self.gcn:
-			samp_neighs = [(samp_neighs[i]-set([nodes[i]])) for i in range(len(samp_neighs))]
+			samp_neighs = [(samp_neighs[i]-set([nodes[i]])) for i in range(len(samp_neighs))]#把中心节点去掉
 		# self.dc.logger.info('2')
-		if len(pre_hidden_embs) == len(unique_nodes):
+		if len(pre_hidden_embs) == len(unique_nodes):#如果涉及到所有节点，保留原矩阵，否则，保留部分矩阵。embed_matrix，当前中心节点的特征
 			embed_matrix = pre_hidden_embs
 		else:
 			embed_matrix = pre_hidden_embs[torch.LongTensor(unique_nodes_list)]
-		# self.dc.logger.info('3')
-		mask = torch.zeros(len(samp_neighs), len(unique_nodes))
+		# self.dc.logger.info('3')#构建邻接矩阵
+		mask = torch.zeros(len(samp_neighs), len(unique_nodes))#邻接矩阵
 		column_indices = [unique_nodes[n] for samp_neigh in samp_neighs for n in samp_neigh]
 		row_indices = [i for i in range(len(samp_neighs)) for j in range(len(samp_neighs[i]))]
 		mask[row_indices, column_indices] = 1
 		# self.dc.logger.info('4')
 
 		if self.agg_func == 'MEAN':
-			num_neigh = mask.sum(1, keepdim=True)
-			mask = mask.div(num_neigh).to(embed_matrix.device)
-			aggregate_feats = mask.mm(embed_matrix)
+			num_neigh = mask.sum(1, keepdim=True)#按行求和，保留维度
+			mask = mask.div(num_neigh).to(embed_matrix.device)#归一化
+			aggregate_feats = mask.mm(embed_matrix)#矩阵相乘，相当于聚合周围邻居节点的信息
 
 		elif self.agg_func == 'MAX':
 			# print(mask)
