@@ -23,7 +23,7 @@ parser.add_argument('--learn_method', type=str, default='sup')
 parser.add_argument('--unsup_loss', type=str, default='normal')
 parser.add_argument('--max_vali_f1', type=float, default=0)
 parser.add_argument('--name', type=str, default='debug')
-parser.add_argument('--config', type=str, default='./src/experiments.conf')
+parser.add_argument('--config', type=str, default='experiments.conf')
 args = parser.parse_args()
 
 if torch.cuda.is_available():
@@ -49,8 +49,8 @@ if __name__ == '__main__':
 	ds = args.dataSet
 	dataCenter = DataCenter(config)
 	dataCenter.load_dataSet(ds)
-	features = torch.FloatTensor(getattr(dataCenter, ds+'_feats')).to(device)
-
+	features = torch.FloatTensor(getattr(dataCenter, ds+'_feats')).to(device)#节点特征
+	# 定义模型
 	graphSage = GraphSage(config['setting.num_layers'], features.size(1), config['setting.hidden_emb_size'], features, getattr(dataCenter, ds+'_adj_lists'), device, gcn=args.gcn, agg_func=args.agg_func)
 	graphSage.to(device)
 
@@ -69,6 +69,7 @@ if __name__ == '__main__':
 
 	for epoch in range(args.epochs):
 		print('----------------------EPOCH %d-----------------------' % epoch)
+		# 返回的是模型
 		graphSage, classification = apply_model(dataCenter, ds, graphSage, classification, unsupervised_loss, args.b_sz, args.unsup_loss, device, args.learn_method)
 		if (epoch+1) % 2 == 0 and args.learn_method == 'unsup':
 			classification, args.max_vali_f1 = train_classification(dataCenter, graphSage, classification, ds, device, args.max_vali_f1, args.name)

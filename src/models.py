@@ -231,8 +231,8 @@ class GraphSage(nn.Module):
 		self.device = device
 		self.agg_func = agg_func
 
-		self.raw_features = raw_features
-		self.adj_lists = adj_lists
+		self.raw_features = raw_features#点的特征
+		self.adj_lists = adj_lists#边的连接
 
 		for index in range(1, num_layers+1):
 			layer_size = out_size if index != 1 else input_size

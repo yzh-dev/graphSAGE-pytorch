@@ -27,9 +27,9 @@ class DataCenter(object):
 					if not info[-1] in label_map:
 						label_map[info[-1]] = len(label_map)
 					labels.append(label_map[info[-1]])
-			feat_data = np.asarray(feat_data)
-			labels = np.asarray(labels, dtype=np.int64)
-			
+			feat_data = np.asarray(feat_data)#导入所有节点的特征
+			labels = np.asarray(labels, dtype=np.int64)#导入所有节点的标签
+			# 导入所有边
 			adj_lists = defaultdict(set)
 			with open(cora_cite_file) as fp:
 				for i,line in enumerate(fp):
@@ -41,7 +41,7 @@ class DataCenter(object):
 					adj_lists[paper2].add(paper1)
 
 			assert len(feat_data) == len(labels) == len(adj_lists)
-			test_indexs, val_indexs, train_indexs = self._split_data(feat_data.shape[0])
+			test_indexs, val_indexs, train_indexs = self._split_data(feat_data.shape[0])#分割数据集
 
 			setattr(self, dataSet+'_test', test_indexs)
 			setattr(self, dataSet+'_val', val_indexs)
